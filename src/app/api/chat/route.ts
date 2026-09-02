@@ -165,6 +165,7 @@ export async function POST(request: Request): Promise<Response> {
     model: google(MODEL_ID),
     instructions: faqInstructions(body.learningGoal, decision.faq.question, decision.faq.answer),
     messages: await convertToModelMessages(messages),
+    onError: () => undefined,
   });
 
   const metadata: ChatMetadata = {

@@ -43,6 +43,19 @@ function userMessage(id: string, text: string): WorkshopMessage {
 }
 
 describe('LiaChat', () => {
+  it('exposes the conversation as a politely announced accessible log', () => {
+    renderChat();
+
+    expect(screen.getByRole('log', { name: 'Conversa com a Lia' })).toHaveAttribute(
+      'aria-live',
+      'polite',
+    );
+    expect(screen.getByRole('log', { name: 'Conversa com a Lia' })).toHaveAttribute(
+      'aria-relevant',
+      'additions text',
+    );
+  });
+
   it('enables the composer after goal selection and reflects the goal in the live panel', () => {
     renderChat();
 

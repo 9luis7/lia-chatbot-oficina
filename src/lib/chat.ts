@@ -186,15 +186,16 @@ export function normalizeText(text: string): string {
 }
 
 export function retrieveFaq(text: string): FaqEntry | undefined {
-  const tokens = new Set(normalizeText(text).split(' ').filter(Boolean));
+  const normalizedText = normalizeText(text);
+  const paddedText = ` ${normalizedText} `;
   let bestMatch: FaqEntry | undefined;
   let bestScore = 0;
 
   for (const entry of FAQ_ENTRIES) {
-    const keywordTokens = new Set(
-      entry.keywords.flatMap((keyword) => normalizeText(keyword).split(' ').filter(Boolean)),
-    );
-    const score = [...keywordTokens].filter((keyword) => tokens.has(keyword)).length;
+    const normalizedKeywords = new Set(entry.keywords.map(normalizeText));
+    const score = [...normalizedKeywords].filter(keyword =>
+      paddedText.includes(` ${keyword} `),
+    ).length;
 
     if (score > bestScore) {
       bestMatch = entry;
@@ -221,11 +222,14 @@ function isHandoffRequest(normalizedText: string): boolean {
 }
 
 function isRecognizedContinuation(normalizedText: string): boolean {
+  const continuation = normalizedText.replace(/^e\s+/, '');
+
   return (
-    normalizedText === 'e por que' ||
-    normalizedText === 'como isso aparece aqui' ||
+    continuation === 'por que' ||
+    continuation === 'como isso aparece aqui' ||
+    continuation === 'como isso aparece neste bot' ||
     /^(?:isso|isto|aquilo|ele|ela|esse|essa|desse|dessa|nisso|nele|nela)\b/.test(
-      normalizedText,
+      continuation,
     )
   );
 }

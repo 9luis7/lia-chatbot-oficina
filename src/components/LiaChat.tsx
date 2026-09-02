@@ -111,7 +111,13 @@ export function LiaChat({ messages, status, error, onSendMessage, onReset }: Lia
             <span aria-hidden="true">••••••••••••</span>
           </div>
 
-          <div className="conversation" aria-label="Conversa">
+          <div
+            className="conversation"
+            role="log"
+            aria-label="Conversa com a Lia"
+            aria-live="polite"
+            aria-relevant="additions text"
+          >
             <article className="message message-assistant welcome-message">
               <div className="speaker-mark" aria-hidden="true">Li</div>
               <div className="message-body">
