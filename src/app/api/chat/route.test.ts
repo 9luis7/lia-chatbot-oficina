@@ -160,6 +160,29 @@ describe('POST /api/chat', () => {
     expect(streamTextMock).not.toHaveBeenCalled();
   });
 
+  it('rejects more than 100 messages without invoking the provider', async () => {
+    const messages = Array.from({ length: 101 }, (_, index) => ({
+      ...userMessage('checklist mínimo'),
+      id: `user-${index}`,
+    }));
+
+    const response = await POST(requestFor(messages));
+
+    expect(response.status).toBe(400);
+    await expect(response.text()).resolves.toMatch(/solicita|pedido|requisi/i);
+    expect(googleMock).not.toHaveBeenCalled();
+    expect(streamTextMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects history without a user message without invoking the provider', async () => {
+    const response = await POST(requestFor([assistantMessage('minimum-checklist')]));
+
+    expect(response.status).toBe(400);
+    await expect(response.text()).resolves.toMatch(/solicita|pedido|requisi/i);
+    expect(googleMock).not.toHaveBeenCalled();
+    expect(streamTextMock).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['empty input', '   ', CHAT_COPY.emptyInput],
     ['501-character input', 'a'.repeat(501), CHAT_COPY.tooLongInput],
@@ -270,26 +293,62 @@ describe('POST /api/chat', () => {
     ]);
   });
 
-  it('uses the last assistant FAQ id for a continuation and marks streamed metadata as memory-backed', async () => {
+  it('handles provider errors without logging or exposing sensitive provider payloads', async () => {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-key';
+    streamTextMock.mockReturnValue({ stream: fakeModelStream() } as never);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await POST(
+      requestFor(
+        [
+          assistantMessage('minimum-checklist'),
+          userMessage('Qual é o checklist mínimo?'),
+        ],
+        'design',
+      ),
+    );
+
+    const providerOnError = streamTextMock.mock.calls[0]?.[0]?.onError;
+    expect(providerOnError).toBeTypeOf('function');
+
+    const handlerResult = providerOnError?.({
+      error: new Error(
+        'SECRET_MARKER HISTORY_MARKER SYSTEM_PROMPT_MARKER',
+      ),
+    });
+    const observableOutput = String(handlerResult);
+
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(observableOutput).not.toMatch(
+      /SECRET_MARKER|HISTORY_MARKER|SYSTEM_PROMPT_MARKER/,
+    );
+
+    consoleError.mockRestore();
+  });
+
+  it('uses the slot FAQ for the documented continuation and marks streamed metadata as memory-backed', async () => {
     process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-key';
     streamTextMock.mockReturnValue({ stream: fakeModelStream() } as never);
 
     const response = await POST(
-      requestFor([assistantMessage('rule-versus-llm'), userMessage('E por que?')], 'memory-state'),
+      requestFor(
+        [assistantMessage('slot-state'), userMessage('E como isso aparece neste bot?')],
+        'memory-state',
+      ),
     );
     const events = await streamEvents(response);
 
     expect(metadataFrom(events)).toEqual([
       {
         route: 'faq',
-        faqId: 'rule-versus-llm',
+        faqId: 'slot-state',
         learningGoal: 'memory-state',
         model: MODEL_ID,
         usedMemory: true,
       },
       {
         route: 'faq',
-        faqId: 'rule-versus-llm',
+        faqId: 'slot-state',
         learningGoal: 'memory-state',
         model: MODEL_ID,
         usedMemory: true,

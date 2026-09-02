@@ -76,10 +76,30 @@ describe('decideConversation', () => {
     });
   });
 
+  it.each([
+    'Qual a previsão de chuva amanhã?',
+    'Qual é o melhor caminho para a estação central?',
+    'Onde encontro restaurantes de comida italiana?',
+  ])('ignores stopwords and keyword fragments in unrelated questions: %s', input => {
+    expect(decideConversation(input)).toMatchObject({
+      kind: 'fallback',
+      route: 'fallback',
+    });
+  });
+
   it('reuses a valid previous FAQ for a recognized continuation', () => {
     expect(decideConversation('E por que?', 'rule-versus-llm')).toMatchObject({
       kind: 'faq',
       faq: { id: 'rule-versus-llm' },
+      usedMemory: true,
+    });
+  });
+
+  it('reuses the slot FAQ for the exact documented demo continuation', () => {
+    expect(decideConversation('E como isso aparece neste bot?', 'slot-state')).toMatchObject({
+      kind: 'faq',
+      route: 'faq',
+      faq: { id: 'slot-state' },
       usedMemory: true,
     });
   });

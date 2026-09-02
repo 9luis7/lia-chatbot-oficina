@@ -1,5 +1,5 @@
 {
-  "name": "lia-chatbot-scaffold",
+  "name": "lia-chatbot-oficina",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.62",
