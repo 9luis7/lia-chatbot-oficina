@@ -13,18 +13,22 @@ de texto pelo modelo.
 
 1. A pessoa escolhe um objetivo de aprendizagem, como design conversacional,
    system prompt, memória, guardrails ou base de conhecimento.
-2. A Lia recebe a pergunta e valida a entrada.
+2. A Lia recebe a pergunta e valida a entrada (incluindo o limite de 500
+   caracteres).
 3. Se a pessoa pedir para falar com o professor, uma regra em código ativa o
    handoff e bloqueia novas mensagens.
-4. Caso contrário, o sistema procura o assunto na FAQ da oficina.
-5. Quando encontra uma FAQ, o Gemini responde usando somente esse conteúdo, o
-   objetivo escolhido e o histórico da conversa.
-6. Quando não encontra uma FAQ, a Lia usa um fallback fixo e oferece o handoff.
+4. Caso contrário, o sistema procura o assunto na FAQ da oficina (uma
+   recuperação local, anterior a RAG).
+5. Quando encontra uma FAQ, e somente nesse caso, o Gemini responde usando
+   somente esse conteúdo, o objetivo escolhido e o histórico da conversa.
+6. Quando não encontra uma FAQ, a Lia usa um fallback fixo e seguro e oferece o
+   handoff. Erros do provedor também recebem uma resposta segura.
 7. Perguntas de continuação podem reutilizar a última FAQ, demonstrando memória
    durante a sessão atual.
 
-As decisões críticas são determinísticas. O LLM conversa, mas não decide quando
-usar fallback ou handoff.
+As decisões críticas são determinísticas, nesta ordem: **validação → handoff →
+FAQ → Gemini → fallback**. O LLM conversa, mas não decide quando usar fallback
+ou handoff; o Gemini é chamado apenas quando há uma FAQ correspondente.
 
 ## Checklist do MVP
 
@@ -41,8 +45,9 @@ usar fallback ou handoff.
 - Next.js com App Router
 - TypeScript
 - Tailwind CSS
-- Vercel AI SDK
-- Google Gemini com o alias `gemini-flash-latest`
+- AI SDK 7 e `@ai-sdk/google`
+- Google Gemini com o alias `gemini-flash-latest` (um alias que pode ser
+  atualizado pelo Google)
 - Vitest e Testing Library
 
 ## Base de conhecimento
@@ -64,7 +69,7 @@ banco vetorial ou banco de dados neste MVP.
 
 ### Requisitos
 
-- Node.js compatível com o Next.js 16;
+- Node.js 24 (recomendado e a versão atual deste workspace);
 - uma chave válida da API do Google Gemini.
 
 ### Configuração
@@ -75,13 +80,16 @@ banco vetorial ou banco de dados neste MVP.
    npm install
    ```
 
-2. Crie o arquivo `.env.local` na raiz do projeto:
+2. Copie o exemplo para criar o arquivo `.env.local` na raiz do projeto:
 
-   ```env
-   GOOGLE_GENERATIVE_AI_API_KEY=sua_chave_aqui
+   ```powershell
+   Copy-Item .env.example .env.local
    ```
 
-3. Inicie o ambiente local:
+3. Abra `.env.local` e preencha `GOOGLE_GENERATIVE_AI_API_KEY` com a sua chave
+   do Gemini.
+
+4. Inicie o ambiente local:
 
    ```bash
    npm run dev
@@ -89,26 +97,30 @@ banco vetorial ou banco de dados neste MVP.
 
 4. Abra [http://localhost:3000](http://localhost:3000).
 
-Não publique o arquivo `.env.local` nem a chave da API.
+Não publique o arquivo `.env.local` nem a chave da API. O arquivo
+`.env.example` contém somente o nome da variável, sem valor real.
 
-## Testes
+## Scripts
 
-Execute a suíte automatizada:
+| Script | Uso |
+| --- | --- |
+| `npm run dev` | inicia o ambiente local de desenvolvimento |
+| `npm test` | executa a suíte Vitest uma vez |
+| `npm run test:watch` | executa o Vitest em modo observação |
+| `npm run lint` | verifica regras de lint |
+| `npm run typecheck` | gera tipos de rotas do Next e verifica TypeScript |
+| `npm run build` | gera o build de produção |
+| `npm run start` | inicia o build de produção |
 
-```bash
-npm test
-```
-
-Execute também as verificações do projeto:
-
-```bash
-npm run lint
-npm run build
-```
+## Testes e segurança
 
 Os testes cobrem normalização com acentos, precedência do handoff, recuperação
 das FAQs, desempate determinístico, fallback, continuação contextual, validação
 das mensagens e tratamento seguro de erros do provedor.
+
+A memória é exclusiva da sessão atual do navegador: ela ajuda a interpretar
+continuações, mas some ao recarregar ou reiniciar a conversa. O handoff é uma
+simulação determinística para a aula, não um contato real com o professor.
 
 ## Roteiro sugerido para a demonstração
 
@@ -116,22 +128,30 @@ das mensagens e tratamento seguro de erros do provedor.
 2. Pergunte “O que é um slot?”.
 3. Continue com “E como isso aparece neste bot?”.
 4. Faça uma pergunta fora do conteúdo da oficina para mostrar o fallback.
-5. Peça para falar com o professor para mostrar o handoff.
+5. Use **Falar com o professor**.
 6. Reinicie a conversa e confirme que o estado foi limpo.
 
 ## Métricas futuras
 
 Uma próxima versão pode acompanhar:
 
-- percentual de perguntas com FAQ encontrada;
-- frequência de fallback;
-- frequência de handoff;
-- resolução sem ajuda humana;
+- FAQ-hit;
+- fallback;
+- handoff;
+- resolução;
 - média de turnos por conversa.
+
+Não há analytics externo instalado neste MVP.
 
 ## Limites do MVP
 
-O projeto não inclui autenticação, persistência após recarregar a página,
-embeddings, banco vetorial, ferramentas, múltiplos agentes, analytics externo ou
+O projeto não inclui autenticação, banco de dados, persistência após recarregar
+a página, embeddings ou banco vetorial, agentes em runtime, analytics externo ou
 deploy público. O handoff é apenas uma simulação para a demonstração e não envia
 mensagens ao professor.
+
+## Deploy opcional
+
+A Vercel CLI não é necessária para rodar localmente. Caso queira preparar um
+fluxo de deploy depois, `npm i -g vercel` libera `vercel env pull`, `vercel
+deploy` e `vercel logs`.
