@@ -9,6 +9,11 @@ import {
   type LearningGoal,
   type WorkshopMessage,
 } from '../lib/chat';
+import {
+  calculateSessionMetrics,
+  type FeedbackByMessageId,
+  type ResolutionFeedback,
+} from '../lib/session-metrics';
 
 export interface LiaChatProps {
   messages: WorkshopMessage[];
@@ -38,9 +43,14 @@ function ChecklistItem({ label, complete }: { label: string; complete: boolean }
   );
 }
 
+function formatRate(rate: number | null) {
+  return rate === null ? '—' : `${Math.round(rate * 100)}%`;
+}
+
 export function LiaChat({ messages, status, error, onSendMessage, onReset }: LiaChatProps) {
   const [learningGoal, setLearningGoal] = useState<LearningGoal>();
   const [draft, setDraft] = useState('');
+  const [feedbackByMessageId, setFeedbackByMessageId] = useState<FeedbackByMessageId>({});
 
   const selectedGoal = GOALS.find(goal => goal.value === learningGoal);
   const userTurnCount = messages.filter(message => message.role === 'user').length;
@@ -63,6 +73,14 @@ export function LiaChat({ messages, status, error, onSendMessage, onReset }: Lia
   );
   const isBusy = status === 'submitted' || status === 'streaming';
   const composerDisabled = !learningGoal || isBusy || hasHandoff;
+  const metrics = calculateSessionMetrics(messages, feedbackByMessageId);
+
+  function recordFeedback(messageId: string, feedback: ResolutionFeedback) {
+    setFeedbackByMessageId(currentFeedback => ({
+      ...currentFeedback,
+      [messageId]: feedback,
+    }));
+  }
 
   function sendDraft() {
     const text = draft.trim();
@@ -87,6 +105,7 @@ export function LiaChat({ messages, status, error, onSendMessage, onReset }: Lia
   function reset() {
     setDraft('');
     setLearningGoal(undefined);
+    setFeedbackByMessageId({});
     onReset();
   }
 
@@ -160,6 +179,33 @@ export function LiaChat({ messages, status, error, onSendMessage, onReset }: Lia
                     >
                       Falar com o professor <span aria-hidden="true">→</span>
                     </button>
+                  ) : null}
+                  {message.role === 'assistant' && message.metadata?.route === 'faq' ? (
+                    <fieldset className="resolution-feedback" disabled={isBusy}>
+                      <legend>Isso resolveu sua dúvida?</legend>
+                      <div className="resolution-options">
+                        <label className="resolution-option">
+                          <input
+                            type="radio"
+                            name={`resolution-feedback-${message.id}`}
+                            value="yes"
+                            checked={feedbackByMessageId[message.id] === 'yes'}
+                            onChange={() => recordFeedback(message.id, 'yes')}
+                          />
+                          <span>Sim</span>
+                        </label>
+                        <label className="resolution-option">
+                          <input
+                            type="radio"
+                            name={`resolution-feedback-${message.id}`}
+                            value="no"
+                            checked={feedbackByMessageId[message.id] === 'no'}
+                            onChange={() => recordFeedback(message.id, 'no')}
+                          />
+                          <span>Não</span>
+                        </label>
+                      </div>
+                    </fieldset>
                   ) : null}
                 </div>
               </article>
@@ -264,6 +310,44 @@ export function LiaChat({ messages, status, error, onSendMessage, onReset }: Lia
             <div><dt>Última FAQ</dt><dd>{lastAssistantMetadata?.faqId ?? '—'}</dd></div>
             <div><dt>Modelo</dt><dd>{MODEL_ID}</dd></div>
           </dl>
+
+          <section className="metrics-panel" aria-labelledby="session-metrics-title">
+            <h2 id="session-metrics-title">Métricas da sessão</h2>
+            <dl className="session-metrics">
+              <div>
+                <dt>FAQ-hit</dt>
+                <dd>
+                  <span>{metrics.faqCount}/{metrics.routeTotal}</span>
+                  <strong>{formatRate(metrics.faqHitRate)}</strong>
+                </dd>
+              </div>
+              <div>
+                <dt>Fallback</dt>
+                <dd>
+                  <span>{metrics.fallbackCount}/{metrics.routeTotal}</span>
+                  <strong>{formatRate(metrics.fallbackRate)}</strong>
+                </dd>
+              </div>
+              <div>
+                <dt>Handoff</dt>
+                <dd>
+                  <span>{metrics.handoffCount}/{metrics.routeTotal}</span>
+                  <strong>{formatRate(metrics.handoffRate)}</strong>
+                </dd>
+              </div>
+              <div>
+                <dt>Resolução</dt>
+                <dd>
+                  <span>{metrics.resolvedCount}/{metrics.ratedCount} avaliadas</span>
+                  <strong>{formatRate(metrics.resolutionRate)}</strong>
+                </dd>
+              </div>
+              <div>
+                <dt>Erros</dt>
+                <dd><strong>{metrics.errorCount}</strong></dd>
+              </div>
+            </dl>
+          </section>
 
           <section className="checklist" aria-labelledby="checklist-title">
             <h2 id="checklist-title">Checklist mínimo</h2>

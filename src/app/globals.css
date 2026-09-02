@@ -212,6 +212,69 @@ fieldset:disabled {
   letter-spacing: 0.02em;
 }
 
+.resolution-feedback {
+  margin: 1rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.resolution-feedback legend {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.resolution-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+}
+
+.resolution-option {
+  position: relative;
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.resolution-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.resolution-option span {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--line-strong);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  font-weight: 750;
+}
+
+.resolution-option:hover span,
+.resolution-option:has(input:checked) span {
+  border-color: var(--magenta-dark);
+  background: var(--magenta-wash);
+  color: var(--ink);
+}
+
+.resolution-option:has(input:focus-visible) span {
+  outline: 3px solid var(--magenta);
+  outline-offset: 3px;
+}
+
+.resolution-feedback:disabled .resolution-option {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .text-action {
   min-height: 44px;
   margin-top: 0.75rem;
@@ -472,6 +535,50 @@ fieldset:disabled {
   font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 0.78rem;
   text-align: right;
+}
+
+.metrics-panel {
+  margin-top: 2rem;
+}
+
+.metrics-panel h2 {
+  margin: 0 0 0.55rem;
+  font: 500 1.7rem/1.2 var(--serif);
+}
+
+.session-metrics {
+  margin: 0;
+  border-top: 1px solid var(--ink);
+}
+
+.session-metrics > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.72rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.session-metrics dt {
+  font-size: 0.84rem;
+  font-weight: 680;
+}
+
+.session-metrics dd {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 0.55rem;
+  margin: 0;
+  color: var(--ink-soft);
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+.session-metrics strong {
+  color: var(--ink);
 }
 
 .checklist {

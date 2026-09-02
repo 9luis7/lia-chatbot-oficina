@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MODEL_ID, type ChatMetadata, type WorkshopMessage } from '../lib/chat';
@@ -40,6 +40,10 @@ function assistantMessage(
 
 function userMessage(id: string, text: string): WorkshopMessage {
   return { id, role: 'user', parts: [{ type: 'text', text }] };
+}
+
+function metricsRow(label: string) {
+  return screen.getByText(label).closest('div');
 }
 
 describe('LiaChat', () => {
@@ -219,5 +223,132 @@ describe('LiaChat', () => {
     expect(screen.getByText('Modelo').closest('div')).toHaveTextContent('gemini-flash-latest');
     expect(screen.getByText('Persona + regras').closest('li')).toHaveTextContent('Completo');
     expect(screen.getByText('1 slot / estado').closest('li')).toHaveTextContent('Pendente');
+  });
+
+  it('shows empty-session metric rates as unavailable and error count as zero', () => {
+    renderChat();
+
+    expect(screen.getByRole('heading', { name: 'Métricas da sessão' })).toBeInTheDocument();
+    expect(metricsRow('FAQ-hit')).toHaveTextContent('—');
+    expect(metricsRow('Fallback')).toHaveTextContent('—');
+    expect(metricsRow('Handoff')).toHaveTextContent('—');
+    expect(metricsRow('Resolução')).toHaveTextContent('—');
+    expect(metricsRow('Erros')).toHaveTextContent('0');
+  });
+
+  it('offers resolution feedback only for completed FAQ messages', () => {
+    renderChat({
+      messages: [
+        assistantMessage('Resposta FAQ.', { route: 'faq', faqId: 'faq-1' }),
+        assistantMessage('Resposta fallback.', { route: 'fallback' }),
+        assistantMessage('Resposta handoff.', { route: 'handoff' }),
+        assistantMessage('Resposta erro.', { route: 'error' }),
+      ],
+    });
+
+    expect(screen.getByRole('group', { name: 'Isso resolveu sua dúvida?' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Sim' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Não' })).toBeInTheDocument();
+  });
+
+  it('calculates rounded route rates and keeps errors outside the route total', () => {
+    renderChat({
+      messages: [
+        assistantMessage('FAQ.', { route: 'faq', faqId: 'faq-1' }),
+        assistantMessage('Fallback.', { route: 'fallback' }),
+        assistantMessage('Handoff.', { route: 'handoff' }),
+        assistantMessage('Erro.', { route: 'error' }),
+      ],
+    });
+
+    expect(metricsRow('FAQ-hit')).toHaveTextContent('1/3');
+    expect(metricsRow('FAQ-hit')).toHaveTextContent('33%');
+    expect(metricsRow('Fallback')).toHaveTextContent('1/3');
+    expect(metricsRow('Fallback')).toHaveTextContent('33%');
+    expect(metricsRow('Handoff')).toHaveTextContent('1/3');
+    expect(metricsRow('Handoff')).toHaveTextContent('33%');
+    expect(metricsRow('Erros')).toHaveTextContent('1');
+  });
+
+  it('replaces a FAQ evaluation when the learner changes the feedback choice', () => {
+    renderChat({
+      messages: [assistantMessage('FAQ.', { route: 'faq', faqId: 'faq-1' })],
+    });
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Sim' }));
+    expect(metricsRow('Resolução')).toHaveTextContent('100%');
+    expect(metricsRow('Resolução')).toHaveTextContent('1/1 avaliadas');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Não' }));
+    expect(metricsRow('Resolução')).toHaveTextContent('0%');
+    expect(metricsRow('Resolução')).toHaveTextContent('0/1 avaliadas');
+  });
+
+  it('keeps multiple FAQ feedback groups independent and derives mixed resolution', () => {
+    renderChat({
+      messages: [
+        { ...assistantMessage('FAQ 1.', { route: 'faq', faqId: 'faq-1' }), id: 'faq-one' },
+        { ...assistantMessage('FAQ 2.', { route: 'faq', faqId: 'faq-2' }), id: 'faq-two' },
+      ],
+    });
+
+    const feedbackGroups = screen.getAllByRole('group', { name: 'Isso resolveu sua dúvida?' });
+    expect(feedbackGroups).toHaveLength(2);
+
+    fireEvent.click(within(feedbackGroups[0]).getByRole('radio', { name: 'Sim' }));
+    fireEvent.click(within(feedbackGroups[1]).getByRole('radio', { name: 'Não' }));
+
+    expect(within(feedbackGroups[0]).getByRole('radio', { name: 'Sim' })).toBeChecked();
+    expect(within(feedbackGroups[1]).getByRole('radio', { name: 'Não' })).toBeChecked();
+    expect(metricsRow('Resolução')).toHaveTextContent('50%');
+    expect(metricsRow('Resolução')).toHaveTextContent('1/2 avaliadas');
+  });
+
+  it.each(['submitted', 'streaming'] as const)(
+    'keeps FAQ feedback visible but disabled while status is %s',
+    status => {
+      renderChat({
+        status,
+        messages: [assistantMessage('FAQ.', { route: 'faq', faqId: 'faq-1' })],
+      });
+
+      const feedbackGroup = screen.getByRole('group', { name: 'Isso resolveu sua dúvida?' });
+      expect(within(feedbackGroup).getByRole('radio', { name: 'Sim' })).toBeDisabled();
+      expect(within(feedbackGroup).getByRole('radio', { name: 'Não' })).toBeDisabled();
+    },
+  );
+
+  it('clears feedback and metrics when the conversation is reset', () => {
+    const faq = assistantMessage('FAQ.', { route: 'faq', faqId: 'faq-1' });
+    const { props, rerender } = renderChat({
+      messages: [faq, assistantMessage('Handoff.', { route: 'handoff' })],
+    });
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Sim' }));
+    expect(metricsRow('Resolução')).toHaveTextContent('100%');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reiniciar conversa' }));
+    expect(props.onReset).toHaveBeenCalledOnce();
+
+    rerender(<LiaChat {...props} messages={[]} />);
+
+    expect(metricsRow('FAQ-hit')).toHaveTextContent('—');
+    expect(metricsRow('Resolução')).toHaveTextContent('—');
+    expect(metricsRow('Erros')).toHaveTextContent('0');
+    expect(screen.queryByRole('group', { name: 'Isso resolveu sua dúvida?' })).not.toBeInTheDocument();
+
+    rerender(<LiaChat {...props} messages={[faq]} />);
+    expect(screen.getByRole('radio', { name: 'Sim' })).not.toBeChecked();
+    expect(metricsRow('Resolução')).toHaveTextContent('—');
+  });
+
+  it('does not send a chat message when recording FAQ feedback', () => {
+    const { props } = renderChat({
+      messages: [assistantMessage('FAQ.', { route: 'faq', faqId: 'faq-1' })],
+    });
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Sim' }));
+
+    expect(props.onSendMessage).not.toHaveBeenCalled();
   });
 });
