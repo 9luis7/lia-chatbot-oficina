@@ -3,6 +3,7 @@ import {
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
+  safeValidateUIMessages,
   streamText,
   toUIMessageStream,
 } from 'ai';
@@ -35,14 +36,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isLearningGoal(value: unknown): value is LearningGoal {
   return typeof value === 'string' && LEARNING_GOALS.includes(value as LearningGoal);
-}
-
-function isWorkshopMessage(value: unknown): value is WorkshopMessage {
-  if (!isRecord(value) || typeof value.id !== 'string' || !Array.isArray(value.parts)) {
-    return false;
-  }
-
-  return value.role === 'system' || value.role === 'user' || value.role === 'assistant';
 }
 
 function extractText(message: WorkshopMessage): string {
@@ -131,11 +124,19 @@ export async function POST(request: Request): Promise<Response> {
     return new Response(INVALID_REQUEST_MESSAGE, { status: 400 });
   }
 
-  if (body.messages.length > 100 || !body.messages.every(isWorkshopMessage)) {
+  if (body.messages.length > 100) {
     return new Response(INVALID_REQUEST_MESSAGE, { status: 400 });
   }
 
-  const messages = body.messages;
+  const validation = await safeValidateUIMessages<WorkshopMessage>({
+    messages: body.messages,
+  });
+
+  if (!validation.success) {
+    return new Response(INVALID_REQUEST_MESSAGE, { status: 400 });
+  }
+
+  const messages = validation.data;
   const userText = latestUserText(messages);
 
   if (userText === undefined) {

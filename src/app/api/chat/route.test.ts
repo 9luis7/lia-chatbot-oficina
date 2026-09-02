@@ -50,10 +50,14 @@ function requestFor(
   messages: WorkshopMessage[],
   learningGoal: LearningGoal = 'faq',
 ): Request {
+  return rawRequest({ messages, learningGoal });
+}
+
+function rawRequest(body: unknown): Request {
   return new Request('http://localhost/api/chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ messages, learningGoal }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -128,6 +132,25 @@ describe('POST /api/chat', () => {
           messages: [userMessage('checklist mínimo')],
           learningGoal: 'unknown-goal',
         }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.text()).resolves.toMatch(/solicita|pedido|requisi/i);
+    expect(googleMock).not.toHaveBeenCalled();
+    expect(streamTextMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a null part', null],
+    ['a non-object part', 'texto solto'],
+    ['a text part without text', { type: 'text' }],
+    ['a text part with non-string text', { type: 'text', text: 42 }],
+  ])('rejects %s with a safe Portuguese 400 response without generation', async (_name, part) => {
+    const response = await POST(
+      rawRequest({
+        messages: [{ id: 'user-1', role: 'user', parts: [part] }],
+        learningGoal: 'faq',
       }),
     );
 
