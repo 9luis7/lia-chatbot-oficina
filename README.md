@@ -43,6 +43,7 @@ ou handoff; o Gemini é chamado apenas quando há uma FAQ correspondente.
 ## Tecnologias
 
 - Next.js com App Router
+- React
 - TypeScript
 - Tailwind CSS
 - AI SDK 7 e `@ai-sdk/google`
@@ -95,7 +96,7 @@ banco vetorial ou banco de dados neste MVP.
    npm run dev
    ```
 
-4. Abra [http://localhost:3000](http://localhost:3000).
+5. Abra [http://localhost:3000](http://localhost:3000).
 
 Não publique o arquivo `.env.local` nem a chave da API. O arquivo
 `.env.example` contém somente o nome da variável, sem valor real.
