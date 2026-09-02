@@ -38,7 +38,8 @@ ou handoff; o Gemini é chamado apenas quando há uma FAQ correspondente.
 - Guardrail e handoff simulando ajuda do professor.
 - Base de conhecimento com sete FAQs da aula.
 - Respostas do modelo transmitidas por streaming.
-- Painel para acompanhar rota, FAQ, memória, modelo e número de turnos.
+- Painel para acompanhar rota, FAQ, memória, modelo, número de turnos e métricas
+  da sessão.
 
 ## Tecnologias
 
@@ -123,26 +124,48 @@ A memória é exclusiva da sessão atual do navegador: ela ajuda a interpretar
 continuações, mas some ao recarregar ou reiniciar a conversa. O handoff é uma
 simulação determinística para a aula, não um contato real com o professor.
 
+## Métricas da sessão
+
+A Lia calcula as métricas localmente a partir dos metadados das mensagens da
+sessão atual e do feedback explícito da pessoa sobre as respostas da FAQ. O
+painel exibe:
+
+- **Turnos do usuário**: quantidade de mensagens enviadas pela pessoa;
+- **FAQ-hit**: quantidade e percentual de respostas encaminhadas para a FAQ;
+- **Fallback**: quantidade e percentual de respostas fora da FAQ;
+- **Handoff**: quantidade e percentual de encaminhamentos ao professor;
+- **Resolução**: respostas da FAQ marcadas como positivas e percentual de
+  resolução;
+- **Erros**: quantidade de respostas com rota de erro.
+
+As taxas de FAQ-hit, fallback e handoff usam exatamente o mesmo denominador:
+`faq + fallback + handoff`. Erros são contados separadamente e não entram
+nesse total. A taxa de resolução é exatamente o feedback positivo dividido por
+todas as respostas da FAQ avaliadas, incluindo avaliações positivas e
+negativas.
+
+O painel arredonda os percentuais para exibição e mostra também a fração
+correspondente, como `1/3` e `33%`. O marcador `—` significa que ainda não há
+denominador ou dados para calcular a taxa; ele não significa desempenho zero.
+
+O feedback aparece somente nas respostas da FAQ. Ele fica local na sessão,
+não chama o Gemini, pode ser alterado, e a alteração substitui a avaliação
+anterior daquela resposta. Reiniciar ou recarregar a página limpa as mensagens,
+o feedback e as métricas.
+
+Essas são métricas de demonstração da sessão atual. O MVP não adiciona banco de
+dados, `localStorage`, endpoint de métricas, analytics externo, gráficos,
+persistência, latência, tokens ou custos.
+
 ## Roteiro sugerido para a demonstração
 
 1. Escolha **Memória + estado** como objetivo.
-2. Pergunte “O que é um slot?”.
-3. Continue com “E como isso aparece neste bot?”.
-4. Faça uma pergunta fora do conteúdo da oficina para mostrar o fallback.
-5. Use **Falar com o professor**.
-6. Reinicie a conversa e confirme que o estado foi limpo.
-
-## Métricas futuras
-
-Uma próxima versão pode acompanhar:
-
-- FAQ-hit;
-- fallback;
-- handoff;
-- resolução;
-- média de turnos por conversa.
-
-Não há analytics externo instalado neste MVP.
+2. Pergunte “O que é um slot?” e observe FAQ-hit `100%` e resolução `—`.
+3. Marque **Sim** e observe resolução `100% · 1 avaliação`.
+4. Faça uma pergunta não relacionada e observe FAQ-hit/fallback em `50%`.
+5. Use **Falar com o professor** e observe aproximadamente `33%` em
+   FAQ-hit/fallback/handoff.
+6. Reinicie a conversa e confirme `—`, zero erros e feedback limpo.
 
 ## Limites do MVP
 
